@@ -18,7 +18,7 @@ import {
   TrueRange
 } from 'technicalindicators';
 
-import { OHLCVData } from './dataFetcher';
+import { OHLCVData } from '../dataFetcher';
 import { DEFAULT_PARAMS } from '../data/defaultParams';
 
 // Main function to calculate multiple indicators
