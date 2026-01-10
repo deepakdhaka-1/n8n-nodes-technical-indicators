@@ -1,3 +1,4 @@
+// nodes/TechnicalIndicators/TechnicalIndicators.node.ts
 import {
   IExecuteFunctions,
   INodeExecutionData,
@@ -374,17 +375,17 @@ export class TechnicalIndicators implements INodeType {
           });
         }
 
-      } catch (error) {
+      } catch (error: any) {
         if (this.continueOnFail()) {
           returnData.push({ 
             json: { 
-              error: error.message,
+              error: error?.message || 'Unknown error',
               ticker: this.getNodeParameter('ticker', i, 'unknown') as string
             } 
           });
           continue;
         }
-        throw new NodeOperationError(this.getNode(), error.message);
+        throw new NodeOperationError(this.getNode(), error?.message || 'Unknown error occurred');
       }
     }
 
