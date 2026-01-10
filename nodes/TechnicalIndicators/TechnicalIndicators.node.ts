@@ -7,7 +7,7 @@ import {
   NodeOperationError,
 } from 'n8n-workflow';
 
-import { fetchOHLCV, streamWebSocket } from './dataFetcher';
+import { OHLCVData } from '../dataFetcher';
 import { calculateIndicators, bulkSnapshot, backtrackAnalysis } from './utils/indicatorCalculator';
 import { INDICATOR_LIST } from './data/indicatorList';
 
