@@ -35,6 +35,8 @@ function normalizeSymbol(ticker: string, exchange: string): string {
     case 'gateio':
     case 'huobi':
     case 'cryptocom':
+    case 'hyperliquid':
+    case 'lightchain':
       return cleaned.includes('/') ? cleaned : cleaned;
     
     default:
@@ -129,6 +131,10 @@ export async function fetchOHLCV(
         return await fetchPolygon(symbol, interval, apiKey, limit);
       case 'yahoo':
         return await fetchYahoo(symbol, interval, limit);
+      case 'hyperliquid':
+        return await fetchHyperliquid(symbol, interval, limit);
+      case 'lightchain':
+        return await fetchLightchain(symbol, interval, limit);
       default:
         throw new Error(`Unsupported exchange: ${exchange}`);
     }
@@ -444,5 +450,74 @@ async function fetchYahoo(symbol: string, interval: string, limit: number): Prom
     low: prices.low[i],
     close: prices.close[i],
     volume: prices.volume[i],
+  }));
+}
+
+// Hyperliquid (HIP-3 Priority)
+async function fetchHyperliquid(symbol: string, interval: string, limit: number): Promise<OHLCVData[]> {
+  const url = `https://api.hyperliquid.xyz/info`;
+  
+  // Hyperliquid uses different interval format
+  const intervalMap: any = {
+    '1m': '1m', '3m': '3m', '5m': '5m', '15m': '15m', '30m': '30m',
+    '1h': '1h', '2h': '2h', '4h': '4h', '1d': '1d', '1w': '1w'
+  };
+  
+  const response = await axios.post(url, {
+    type: 'candleSnapshot',
+    req: {
+      coin: symbol,
+      interval: intervalMap[interval] || '1h',
+      startTime: Date.now() - (limit * 3600000), // Approximate
+      endTime: Date.now()
+    }
+  });
+  
+  if (!response.data || !Array.isArray(response.data)) {
+    throw new Error('Invalid Hyperliquid response');
+  }
+  
+  return response.data.slice(0, limit).map((c: any) => ({
+    timestamp: c.t,
+    open: parseFloat(c.o),
+    high: parseFloat(c.h),
+    low: parseFloat(c.l),
+    close: parseFloat(c.c),
+    volume: parseFloat(c.v),
+  }));
+}
+
+// Lightchain (HIP-3 Priority)
+async function fetchLightchain(symbol: string, interval: string, limit: number): Promise<OHLCVData[]> {
+  // Lightchain AI's API endpoint
+  const url = `https://api.lightchain.ai/v1/market/candles`;
+  
+  // Convert interval to Lightchain format
+  const intervalMap: any = {
+    '1m': '60', '5m': '300', '15m': '900', '30m': '1800',
+    '1h': '3600', '4h': '14400', '1d': '86400', '1w': '604800'
+  };
+  
+  const response = await axios.get(url, {
+    params: {
+      symbol: symbol,
+      resolution: intervalMap[interval] || '3600',
+      limit: Math.min(limit, 5000),
+      from: Math.floor((Date.now() / 1000) - (limit * parseInt(intervalMap[interval] || '3600'))),
+      to: Math.floor(Date.now() / 1000)
+    }
+  });
+  
+  if (!response.data || !response.data.t) {
+    throw new Error('Invalid Lightchain response');
+  }
+  
+  return response.data.t.map((timestamp: number, i: number) => ({
+    timestamp: timestamp * 1000,
+    open: parseFloat(response.data.o[i]),
+    high: parseFloat(response.data.h[i]),
+    low: parseFloat(response.data.l[i]),
+    close: parseFloat(response.data.c[i]),
+    volume: parseFloat(response.data.v[i]),
   }));
 }
