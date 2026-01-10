@@ -1,9 +1,4 @@
 
-// ============================================
-// FILE 8: nodes/TechnicalIndicators/indicators.svg
-// ============================================
-// Save this as an SVG file in the same directory
-/*
 <?xml version="1.0" encoding="UTF-8"?>
 <svg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg">
   <rect width="60" height="60" rx="8" fill="#4CAF50"/>
@@ -14,4 +9,4 @@
   <path d="M10 45 L50 45" stroke="white" stroke-width="2"/>
   <path d="M10 15 L10 50" stroke="white" stroke-width="2"/>
 </svg>
-*/
+
