@@ -1,8 +1,10 @@
 {
   "name": "n8n-nodes-technical-indicators",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Complete technical indicators node with 208+ indicators, REST and WebSocket support",
-  "keywords": ["n8n-community-node-package"],
+  "keywords": [
+    "n8n-community-node-package"
+  ],
   "license": "MIT",
   "homepage": "https://github.com/yourusername/n8n-nodes-technical-indicators",
   "author": {
@@ -22,11 +24,15 @@
     "lintfix": "eslint nodes package.json --fix",
     "prepublishOnly": "npm run build && npm run lint -c .eslintrc.prepublish.js nodes package.json"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "n8n": {
     "n8nNodesApiVersion": 1,
     "credentials": [],
-    "nodes": ["dist/nodes/TechnicalIndicators/TechnicalIndicators.node.js"]
+    "nodes": [
+      "dist/nodes/TechnicalIndicators/TechnicalIndicators.node.js"
+    ]
   },
   "devDependencies": {
     "@typescript-eslint/parser": "^5.0.0",
