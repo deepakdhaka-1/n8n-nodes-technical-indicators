@@ -7,6 +7,8 @@ import {
 
 import { fetchOHLCV, OHLCVData } from './dataFetcher';
 import { DEFAULT_PARAMS } from '../data/defaultParams';
+import * as helpers from './indicatorHelpers';
+import * as helpers2 from './indicatorHelpers2';
 
 // Calculate required candles for each indicator
 function getRequiredCandles(indicator: string, params: any): number {
@@ -589,28 +591,28 @@ function computeIndicator(indicator: string, data: any, params: any): any {
 
       // ===== STATISTICAL FUNCTIONS =====
       case 'beta':
-        return calculateBeta(closes, params.marketReturns || closes);
+        return helpers.calculateBeta(closes, params.marketReturns || closes);
       
       case 'correl':
-        return calculateCorrelation(closes, params.series2 || closes, params.period || 30);
+        return helpers.calculateCorrelation(closes, params.series2 || closes, params.period || 30);
       
       case 'linearreg':
-        return calculateLinearRegression(closes, params.period || 14);
+        return helpers.calculateLinearRegression(closes, params.period || 14);
       
       case 'linearreg_angle':
-        return calculateLinearRegressionAngle(closes, params.period || 14);
+        return helpers.calculateLinearRegressionAngle(closes, params.period || 14);
       
       case 'linearreg_intercept':
-        return calculateLinearRegressionIntercept(closes, params.period || 14);
+        return helpers.calculateLinearRegressionIntercept(closes, params.period || 14);
       
       case 'linearreg_slope':
-        return calculateLinearRegressionSlope(closes, params.period || 14);
+        return helpers.calculateLinearRegressionSlope(closes, params.period || 14);
       
       case 'tsf':
-        return calculateTSF(closes, params.period || 14);
+        return helpers.calculateTSF(closes, params.period || 14);
       
       case 'var':
-        return calculateVariance(closes, params.period || 20);
+        return helpers.calculateVariance(closes, params.period || 20);
 
       // CONTINUE IN NEXT MESSAGE DUE TO LENGTH...
       
@@ -651,4 +653,54 @@ function calculateHMA(values: number[], period: number): number[] {
   return WMA.calculate({ values: diff, period: sqrtPeriod });
 }
 
-// Add more helper functions as needed...
+// Import all other functions from helpers
+const calculateT3 = helpers.calculateT3;
+const calculateMAMA = helpers.calculateMAMA;
+const calculateMidpoint = helpers.calculateMidpoint;
+const calculateMidprice = helpers.calculateMidprice;
+const calculateSMMA = helpers.calculateSMMA;
+const calculateVIDYA = helpers.calculateVIDYA;
+const calculateWilders = helpers.calculateWilders;
+const calculateZLEMA = helpers.calculateZLEMA;
+const calculateWilliamsAlligator = helpers.calculateWilliamsAlligator;
+const calculateHTTrendline = helpers.calculateHTTrendline;
+const calculateCoppockCurve = helpers.calculateCoppockCurve;
+const calculateStdDev = helpers.calculateStdDev;
+const calculateVolatility = helpers.calculateVolatility;
+const calculateMassIndex = helpers.calculateMassIndex;
+const calculateKeltnerChannels = helpers.calculateKeltnerChannels;
+const calculateDonchianChannels = helpers.calculateDonchianChannels;
+const calculateAccelerationBands = helpers.calculateAccelerationBands;
+const calculateAD = helpers.calculateAD;
+const calculateADOSC = helpers.calculateADOSC;
+const calculateCMF = helpers.calculateCMF;
+const calculateVWAP = helpers.calculateVWAP;
+const calculateNVI = helpers.calculateNVI;
+const calculatePVI = helpers.calculatePVI;
+const calculateVOSC = helpers.calculateVOSC;
+const calculateVolumeSplit = helpers.calculateVolumeSplit;
+const calculateKVO = helpers.calculateKVO;
+const calculateUltimateOscillator = helpers2.calculateUltimateOscillator;
+const calculateRVGI = helpers2.calculateRVGI;
+const calculateSqueeze = helpers2.calculateSqueeze;
+const calculateSTC = helpers2.calculateSTC;
+const calculateTRIX = helpers2.calculateTRIX;
+const calculateWAD = helpers2.calculateWAD;
+const calculateIchimoku = helpers2.calculateIchimoku;
+const calculateDI = helpers2.calculateDI;
+const calculateDM = helpers2.calculateDM;
+const calculateTDSequential = helpers2.calculateTDSequential;
+const calculateSupertrend = helpers2.calculateSupertrend;
+const calculateVortex = helpers2.calculateVortex;
+const calculateQStick = helpers2.calculateQStick;
+const calculateDirectionalMovement = helpers2.calculateDirectionalMovement;
+const calculateDMI = helpers2.calculateDMI;
+const calculateAcceleratorOscillator = helpers2.calculateAcceleratorOscillator;
+const calculateChoppiness = helpers2.calculateChoppiness;
+const calculateDPO = helpers2.calculateDPO;
+const calculateEOM = helpers2.calculateEOM;
+const calculateFOSC = helpers2.calculateFOSC;
+const calculatePriorSwingHigh = helpers2.calculatePriorSwingHigh;
+const calculatePriorSwingLow = helpers2.calculatePriorSwingLow;
+const calculatePivotPoints = helpers2.calculatePivotPoints;
+const calculateFibRetracement = helpers2.calculateFibRetracement;
