@@ -5,11 +5,11 @@ import {
   INodeType,
   INodeTypeDescription,
   NodeOperationError,
+  INodeProperties,
 } from 'n8n-workflow';
 
-import { fetchOHLCV, streamWebSocket } from './dataFetcher';
-
-import { calculateIndicators, bulkSnapshot, backtrackAnalysis } from './utils/indicatorCalculator';
+import { fetchOHLCV } from './utils/dataFetcher';
+import { calculateIndicators } from './utils/indicatorCalculator';
 import { INDICATOR_LIST } from './data/indicatorList';
 
 export class TechnicalIndicators implements INodeType {
@@ -19,8 +19,8 @@ export class TechnicalIndicators implements INodeType {
     icon: 'file:indicators.svg',
     group: ['transform'],
     version: 1,
-    subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',
-    description: 'Complete 208 technical indicators with REST and WebSocket support (HIP-3 compatible)',
+    subtitle: '={{$parameter["operation"]}}',
+    description: 'Complete 208 technical indicators with multi-exchange support',
     defaults: {
       name: 'Technical Indicators',
     },
@@ -28,32 +28,10 @@ export class TechnicalIndicators implements INodeType {
     outputs: ['main'],
     properties: [
       {
-        displayName: 'Resource',
-        name: 'resource',
-        type: 'options',
-        noDataExpression: true,
-        options: [
-          {
-            name: 'REST API',
-            value: 'rest',
-          },
-          {
-            name: 'WebSocket (Real-time)',
-            value: 'websocket',
-          },
-        ],
-        default: 'rest',
-        description: 'Choose between REST API or WebSocket for real-time data',
-      },
-      {
         displayName: 'Operation',
         name: 'operation',
         type: 'options',
-        displayOptions: {
-          show: {
-            resource: ['rest'],
-          },
-        },
+        noDataExpression: true,
         options: [
           {
             name: 'Get OHLCV Data',
@@ -63,45 +41,10 @@ export class TechnicalIndicators implements INodeType {
           {
             name: 'Calculate Indicators',
             value: 'calculateIndicators',
-            description: 'Calculate selected technical indicators',
-          },
-          {
-            name: 'Bulk Indicators Snapshot',
-            value: 'bulkSnapshot',
-            description: 'Get latest values for multiple indicators at once',
-          },
-          {
-            name: 'Backtrack Analysis',
-            value: 'backtrack',
-            description: 'Historical analysis of indicators over time',
+            description: 'Calculate technical indicators with auto-adjusted candles',
           },
         ],
         default: 'getOHLCV',
-        noDataExpression: true,
-      },
-      {
-        displayName: 'WebSocket Operation',
-        name: 'wsOperation',
-        type: 'options',
-        displayOptions: {
-          show: {
-            resource: ['websocket'],
-          },
-        },
-        options: [
-          {
-            name: 'Stream Real-Time OHLCV',
-            value: 'streamOHLCV',
-            description: 'Stream live candlestick data (even before candle close)',
-          },
-          {
-            name: 'Stream with Indicators',
-            value: 'streamWithIndicators',
-            description: 'Real-time data with calculated indicators',
-          },
-        ],
-        default: 'streamOHLCV',
-        noDataExpression: true,
       },
       {
         displayName: 'Ticker Symbol',
@@ -109,34 +52,41 @@ export class TechnicalIndicators implements INodeType {
         type: 'string',
         default: '',
         placeholder: 'BTC/USDT, AAPL, ETH/USD',
-        description: 'Trading pair or stock symbol (HIP-3 assets supported)',
+        description: 'Trading pair or stock symbol',
         required: true,
       },
       {
-        displayName: 'Data Source',
-        name: 'dataSource',
+        displayName: 'Exchange',
+        name: 'exchange',
         type: 'options',
         options: [
           { name: 'Binance', value: 'binance' },
           { name: 'Binance US', value: 'binanceus' },
           { name: 'Coinbase', value: 'coinbase' },
+          { name: 'Coinbase Pro', value: 'coinbasepro' },
           { name: 'Kraken', value: 'kraken' },
           { name: 'Bitfinex', value: 'bitfinex' },
           { name: 'KuCoin', value: 'kucoin' },
           { name: 'Bybit', value: 'bybit' },
+          { name: 'OKX', value: 'okx' },
+          { name: 'Huobi', value: 'huobi' },
+          { name: 'Gate.io', value: 'gateio' },
+          { name: 'Bitget', value: 'bitget' },
+          { name: 'MEXC', value: 'mexc' },
+          { name: 'Crypto.com', value: 'cryptocom' },
           { name: 'Alpha Vantage (Stocks)', value: 'alphavantage' },
           { name: 'Twelve Data (Stocks)', value: 'twelvedata' },
-          { name: 'Custom API', value: 'custom' },
+          { name: 'Polygon.io (Stocks)', value: 'polygon' },
+          { name: 'Yahoo Finance', value: 'yahoo' },
         ],
         default: 'binance',
-        description: 'Data source for OHLCV data',
+        description: 'Select exchange or data provider',
       },
       {
-        displayName: 'Timeframe / Interval',
+        displayName: 'Timeframe',
         name: 'timeframe',
         type: 'options',
         options: [
-          { name: '1 Second', value: '1s' },
           { name: '1 Minute', value: '1m' },
           { name: '3 Minutes', value: '3m' },
           { name: '5 Minutes', value: '5m' },
@@ -160,11 +110,11 @@ export class TechnicalIndicators implements INodeType {
         displayName: 'Limit (Candles)',
         name: 'limit',
         type: 'number',
-        default: 100,
-        description: 'Number of candles to fetch (max varies by exchange)',
+        default: 500,
+        description: 'Number of candles to fetch',
         displayOptions: {
           show: {
-            resource: ['rest'],
+            operation: ['getOHLCV'],
           },
         },
       },
@@ -174,66 +124,86 @@ export class TechnicalIndicators implements INodeType {
         type: 'multiOptions',
         displayOptions: {
           show: {
-            operation: ['calculateIndicators', 'bulkSnapshot', 'backtrack'],
+            operation: ['calculateIndicators'],
           },
         },
         typeOptions: {
           loadOptionsMethod: 'getIndicators',
         },
-        default: ['rsi', 'ema', 'macd'],
-        description: 'Select one or more indicators to calculate (208 available)',
+        default: ['rsi'],
+        description: 'Select indicators to calculate',
+        required: true,
       },
       {
-        displayName: 'Indicator Parameters (JSON)',
+        displayName: 'Result Count',
+        name: 'resultCount',
+        type: 'number',
+        default: 1,
+        description: 'Number of result values to return for each indicator',
+        displayOptions: {
+          show: {
+            operation: ['calculateIndicators'],
+          },
+        },
+      },
+      {
+        displayName: 'Backtrack',
+        name: 'backtrack',
+        type: 'number',
+        default: 0,
+        description: 'Skip N latest candles (0 = use latest candle, 1 = skip latest and use previous)',
+        displayOptions: {
+          show: {
+            operation: ['calculateIndicators'],
+          },
+        },
+      },
+      {
+        displayName: 'Indicator Parameters',
         name: 'indicatorParams',
-        type: 'json',
-        displayOptions: {
-          show: {
-            operation: ['calculateIndicators', 'bulkSnapshot', 'backtrack'],
-          },
-        },
-        default: '{\n  "rsi": {"period": 14},\n  "ema": {"period": 20},\n  "macd": {"fastPeriod": 12, "slowPeriod": 26, "signalPeriod": 9}\n}',
-        description: 'Custom parameters for indicators (uses defaults if not specified)',
+        type: 'fixedCollection',
         typeOptions: {
-          alwaysOpenEditWindow: true,
+          multipleValues: true,
         },
-      },
-      {
-        displayName: 'WebSocket URL',
-        name: 'wsUrl',
-        type: 'string',
         displayOptions: {
           show: {
-            resource: ['websocket'],
+            operation: ['calculateIndicators'],
           },
         },
-        default: 'wss://stream.binance.com:9443/ws',
-        placeholder: 'wss://stream.binance.com:9443/ws',
-        description: 'WebSocket endpoint URL (auto-configured for selected exchange)',
-      },
-      {
-        displayName: 'Stream Duration (seconds)',
-        name: 'duration',
-        type: 'number',
-        displayOptions: {
-          show: {
-            resource: ['websocket'],
+        default: {},
+        placeholder: 'Add Parameter',
+        options: [
+          {
+            name: 'parameter',
+            displayName: 'Parameter',
+            values: [
+              {
+                displayName: 'Indicator',
+                name: 'indicator',
+                type: 'string',
+                default: '',
+                placeholder: 'rsi',
+                description: 'Indicator name',
+              },
+              {
+                displayName: 'Parameter Name',
+                name: 'paramName',
+                type: 'string',
+                default: '',
+                placeholder: 'period',
+                description: 'Parameter name (e.g., period, fastPeriod, slowPeriod)',
+              },
+              {
+                displayName: 'Value',
+                name: 'value',
+                type: 'number',
+                default: 14,
+                description: 'Parameter value',
+              },
+            ],
           },
-        },
-        default: 60,
-        description: 'How long to stream data (0 for continuous)',
-      },
-      {
-        displayName: 'Backtrack Periods',
-        name: 'backtrackPeriods',
-        type: 'number',
-        displayOptions: {
-          show: {
-            operation: ['backtrack'],
-          },
-        },
-        default: 50,
-        description: 'Number of historical periods to analyze',
+        ],
+        description: 'Custom parameters for indicators',
       },
       {
         displayName: 'API Key',
@@ -241,7 +211,7 @@ export class TechnicalIndicators implements INodeType {
         type: 'string',
         displayOptions: {
           show: {
-            dataSource: ['alphavantage', 'twelvedata'],
+            exchange: ['alphavantage', 'twelvedata', 'polygon'],
           },
         },
         default: '',
@@ -261,132 +231,87 @@ export class TechnicalIndicators implements INodeType {
   async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
     const items = this.getInputData();
     const returnData: INodeExecutionData[] = [];
-    const resource = this.getNodeParameter('resource', 0) as string;
 
     for (let i = 0; i < items.length; i++) {
       try {
-        if (resource === 'rest') {
-          const operation = this.getNodeParameter('operation', i) as string;
-          const ticker = this.getNodeParameter('ticker', i) as string;
-          const dataSource = this.getNodeParameter('dataSource', i) as string;
-          const timeframe = this.getNodeParameter('timeframe', i) as string;
+        const operation = this.getNodeParameter('operation', i) as string;
+        const ticker = this.getNodeParameter('ticker', i) as string;
+        const exchange = this.getNodeParameter('exchange', i) as string;
+        const timeframe = this.getNodeParameter('timeframe', i) as string;
+
+        if (operation === 'getOHLCV') {
           const limit = this.getNodeParameter('limit', i) as number;
           const apiKey = this.getNodeParameter('apiKey', i, '') as string;
 
-          if (operation === 'getOHLCV') {
-            const ohlcvData = await fetchOHLCV(ticker, dataSource, timeframe, limit, apiKey);
-            returnData.push({ 
-              json: { 
-                ticker, 
-                timeframe, 
-                dataSource,
-                candleCount: ohlcvData.length,
-                data: ohlcvData 
-              } 
-            });
-
-          } else if (operation === 'calculateIndicators') {
-            const indicators = this.getNodeParameter('indicators', i) as string[];
-            const paramsJson = this.getNodeParameter('indicatorParams', i) as string;
-            const params = JSON.parse(paramsJson);
-            
-            const ohlcvData = await fetchOHLCV(ticker, dataSource, timeframe, limit, apiKey);
-            const results = await calculateIndicators(ohlcvData, indicators, params);
-            
-            returnData.push({ 
-              json: { 
-                ticker, 
-                timeframe, 
-                dataSource,
-                indicators: results,
-                candleCount: ohlcvData.length,
-              } 
-            });
-
-          } else if (operation === 'bulkSnapshot') {
-            const indicators = this.getNodeParameter('indicators', i) as string[];
-            const paramsJson = this.getNodeParameter('indicatorParams', i) as string;
-            const params = JSON.parse(paramsJson);
-            
-            const ohlcvData = await fetchOHLCV(ticker, dataSource, timeframe, limit, apiKey);
-            const snapshot = await bulkSnapshot(ohlcvData, indicators, params);
-            
-            returnData.push({ 
-              json: { 
-                ticker, 
-                timeframe,
-                dataSource,
-                snapshot 
-              } 
-            });
-
-          } else if (operation === 'backtrack') {
-            const periods = this.getNodeParameter('backtrackPeriods', i) as number;
-            const indicators = this.getNodeParameter('indicators', i) as string[];
-            const paramsJson = this.getNodeParameter('indicatorParams', i) as string;
-            const params = JSON.parse(paramsJson);
-            
-            const ohlcvData = await fetchOHLCV(ticker, dataSource, timeframe, limit, apiKey);
-            const backtrackResults = await backtrackAnalysis(ohlcvData, indicators, params, periods);
-            
-            returnData.push({ 
-              json: { 
-                ticker, 
-                timeframe,
-                dataSource,
-                backtrack: backtrackResults 
-              } 
-            });
-          }
-
-        } else if (resource === 'websocket') {
-          const wsOperation = this.getNodeParameter('wsOperation', i) as string;
-          const ticker = this.getNodeParameter('ticker', i) as string;
-          const wsUrl = this.getNodeParameter('wsUrl', i) as string;
-          const duration = this.getNodeParameter('duration', i) as number;
-          const dataSource = this.getNodeParameter('dataSource', i) as string;
-
-          let indicators: string[] = [];
-          let params: any = {};
-
-          if (wsOperation === 'streamWithIndicators') {
-            indicators = this.getNodeParameter('indicators', i) as string[];
-            const paramsJson = this.getNodeParameter('indicatorParams', i) as string;
-            params = JSON.parse(paramsJson);
-          }
-
-          const wsData = await streamWebSocket(
-            wsUrl, 
-            ticker, 
-            duration, 
-            wsOperation, 
-            dataSource,
-            indicators,
-            params
-          );
+          const ohlcvData = await fetchOHLCV(ticker, exchange, timeframe, limit, apiKey);
           
-          returnData.push({ 
-            json: { 
-              ticker, 
-              dataSource,
-              realTimeData: wsData,
-              streamDuration: duration,
-              tickCount: wsData.length
-            } 
+          returnData.push({
+            json: {
+              ticker,
+              exchange,
+              timeframe,
+              candleCount: ohlcvData.length,
+              data: ohlcvData,
+            },
+          });
+
+        } else if (operation === 'calculateIndicators') {
+          const indicators = this.getNodeParameter('indicators', i) as string[];
+          const resultCount = this.getNodeParameter('resultCount', i) as number;
+          const backtrack = this.getNodeParameter('backtrack', i) as number;
+          const apiKey = this.getNodeParameter('apiKey', i, '') as string;
+          
+          // Parse indicator parameters from fixedCollection
+          const paramCollection = this.getNodeParameter('indicatorParams', i) as any;
+          const customParams: any = {};
+          
+          if (paramCollection.parameter && Array.isArray(paramCollection.parameter)) {
+            for (const param of paramCollection.parameter) {
+              if (!customParams[param.indicator]) {
+                customParams[param.indicator] = {};
+              }
+              customParams[param.indicator][param.paramName] = param.value;
+            }
+          }
+
+          // Calculate indicators with auto-adjusted candles
+          const results = await calculateIndicators(
+            ticker,
+            exchange,
+            timeframe,
+            indicators,
+            customParams,
+            resultCount,
+            backtrack,
+            apiKey
+          );
+
+          returnData.push({
+            json: {
+              ticker,
+              exchange,
+              timeframe,
+              resultCount,
+              backtrack,
+              indicators: results,
+            },
           });
         }
 
       } catch (error: any) {
         if (this.continueOnFail()) {
-          returnData.push({ 
-            json: { 
+          returnData.push({
+            json: {
               error: error?.message || 'Unknown error',
-              ticker: this.getNodeParameter('ticker', i, 'unknown') as string
-            } 
+              ticker: this.getNodeParameter('ticker', i, 'unknown') as string,
+            },
           });
           continue;
         }
-        throw new NodeOperationError(this.getNode(), error?.message || 'Unknown error occurred');
+        throw new NodeOperationError(
+          this.getNode(),
+          error?.message || 'Unknown error occurred'
+        );
       }
     }
 
