@@ -36,7 +36,6 @@ function normalizeSymbol(ticker: string, exchange: string): string {
     case 'huobi':
     case 'cryptocom':
     case 'hyperliquid':
-    case 'lightchain':
       return cleaned.includes('/') ? cleaned : cleaned;
     
     default:
@@ -133,8 +132,6 @@ export async function fetchOHLCV(
         return await fetchYahoo(symbol, interval, limit);
       case 'hyperliquid':
         return await fetchHyperliquid(symbol, interval, limit);
-      case 'lightchain':
-        return await fetchLightchain(symbol, interval, limit);
       default:
         throw new Error(`Unsupported exchange: ${exchange}`);
     }
@@ -453,7 +450,7 @@ async function fetchYahoo(symbol: string, interval: string, limit: number): Prom
   }));
 }
 
-// Hyperliquid (HIP-3 Priority)
+// Hyperliquid
 async function fetchHyperliquid(symbol: string, interval: string, limit: number): Promise<OHLCVData[]> {
   const url = `https://api.hyperliquid.xyz/info`;
   
@@ -484,40 +481,5 @@ async function fetchHyperliquid(symbol: string, interval: string, limit: number)
     low: parseFloat(c.l),
     close: parseFloat(c.c),
     volume: parseFloat(c.v),
-  }));
-}
-
-// Lightchain (HIP-3 Priority)
-async function fetchLightchain(symbol: string, interval: string, limit: number): Promise<OHLCVData[]> {
-  // Lightchain AI's API endpoint
-  const url = `https://api.lightchain.ai/v1/market/candles`;
-  
-  // Convert interval to Lightchain format
-  const intervalMap: any = {
-    '1m': '60', '5m': '300', '15m': '900', '30m': '1800',
-    '1h': '3600', '4h': '14400', '1d': '86400', '1w': '604800'
-  };
-  
-  const response = await axios.get(url, {
-    params: {
-      symbol: symbol,
-      resolution: intervalMap[interval] || '3600',
-      limit: Math.min(limit, 5000),
-      from: Math.floor((Date.now() / 1000) - (limit * parseInt(intervalMap[interval] || '3600'))),
-      to: Math.floor(Date.now() / 1000)
-    }
-  });
-  
-  if (!response.data || !response.data.t) {
-    throw new Error('Invalid Lightchain response');
-  }
-  
-  return response.data.t.map((timestamp: number, i: number) => ({
-    timestamp: timestamp * 1000,
-    open: parseFloat(response.data.o[i]),
-    high: parseFloat(response.data.h[i]),
-    low: parseFloat(response.data.l[i]),
-    close: parseFloat(response.data.c[i]),
-    volume: parseFloat(response.data.v[i]),
   }));
 }
