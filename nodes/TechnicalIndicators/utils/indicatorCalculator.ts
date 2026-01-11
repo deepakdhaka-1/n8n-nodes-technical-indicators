@@ -1,8 +1,7 @@
 // nodes/TechnicalIndicators/utils/indicatorCalculator.ts
 import { 
   RSI, MACD, SMA, EMA, WMA, BollingerBands, Stochastic, StochasticRSI,
-  ADX, ADXR, CCI, MFI, ROC, WilliamsR, ATR, OBV, TrueRange, PSAR,
-  Aroon, AroonOscillator, BOP, CMO, DX
+  ADX, CCI, MFI, ROC, WilliamsR, ATR, OBV, TrueRange, PSAR
 } from 'technicalindicators';
 
 import { fetchOHLCV, OHLCVData } from './dataFetcher';
@@ -181,20 +180,19 @@ function computeIndicator(indicator: string, data: any, params: any): any {
         });
       
       case 'adxr':
-        return ADXR.calculate({
+        const adxValues = ADX.calculate({
           high: highs,
           low: lows,
           close: closes,
           period: params.period || 14,
         });
+        return adxValues.map((adx: any, i: number) => {
+          if (i < params.period || 14) return null;
+          return (adx.adx + adxValues[i - (params.period || 14)].adx) / 2;
+        }).filter((v: any) => v !== null);
       
       case 'dx':
-        return DX.calculate({
-          high: highs,
-          low: lows,
-          close: closes,
-          period: params.period || 14,
-        });
+        return calculateDX(highs, lows, closes, params.period || 14);
       
       case 'cci':
         return CCI.calculate({
@@ -205,10 +203,7 @@ function computeIndicator(indicator: string, data: any, params: any): any {
         });
       
       case 'cmo':
-        return CMO.calculate({
-          values: closes,
-          period: params.period || 14,
-        });
+        return calculateCMO(closes, params.period || 14);
       
       case 'mfi':
         return MFI.calculate({
@@ -258,26 +253,14 @@ function computeIndicator(indicator: string, data: any, params: any): any {
         });
       
       case 'aroon':
-        return Aroon.calculate({
-          high: highs,
-          low: lows,
-          period: params.period || 25,
-        });
+        return calculateAroon(highs, lows, params.period || 25);
       
       case 'aroonosc':
-        return AroonOscillator.calculate({
-          high: highs,
-          low: lows,
-          period: params.period || 25,
-        });
+        const aroonValues = calculateAroon(highs, lows, params.period || 25);
+        return aroonValues.map((a: any) => a.up - a.down);
       
       case 'bop':
-        return BOP.calculate({
-          open: opens,
-          high: highs,
-          low: lows,
-          close: closes,
-        });
+        return calculateBOP(opens, highs, lows, closes);
       
       case 'apo':
         const fastEmaAPO = EMA.calculate({ values: closes, period: params.fastPeriod || 12 });
@@ -361,7 +344,7 @@ function computeIndicator(indicator: string, data: any, params: any): any {
         return calculateHMA(closes, params.period || 9);
       
       case 'kama':
-        return KAMA.calculate({ values: closes, period: params.period || 10 });
+        return calculateKAMA(closes, params.period || 10);
       
       case 't3':
         return calculateT3(closes, params.period || 5, params.volumeFactor || 0.7);
@@ -373,7 +356,7 @@ function computeIndicator(indicator: string, data: any, params: any): any {
         return SMA.calculate({ values: closes, period: params.period || 20 });
       
       case 'vwma':
-        return helpers.calculateVWMA(closes, volumes, params.period || 20);
+        return calculateVWMA(closes, volumes, params.period || 20);
       
       case 'mama':
         return calculateMAMA(closes, params.fastLimit || 0.5, params.slowLimit || 0.05);
@@ -682,6 +665,67 @@ function calculateVWMA(closes: number[], volumes: number[], period: number): num
     result.push(sumPV / (sumV || 1));
   }
   return result;
+}
+
+function calculateDX(highs: number[], lows: number[], closes: number[], period: number): number[] {
+  const plusDM = [], minusDM = [], tr = [];
+  
+  for (let i = 1; i < highs.length; i++) {
+    const upMove = highs[i] - highs[i - 1];
+    const downMove = lows[i - 1] - lows[i];
+    
+    plusDM.push(upMove > downMove && upMove > 0 ? upMove : 0);
+    minusDM.push(downMove > upMove && downMove > 0 ? downMove : 0);
+    tr.push(Math.max(highs[i] - lows[i], Math.abs(highs[i] - closes[i - 1]), Math.abs(lows[i] - closes[i - 1])));
+  }
+  
+  const smoothPlusDM = SMA.calculate({ values: plusDM, period });
+  const smoothMinusDM = SMA.calculate({ values: minusDM, period });
+  const smoothTR = SMA.calculate({ values: tr, period });
+  
+  return smoothPlusDM.map((pdm, i) => {
+    const plusDI = (pdm / (smoothTR[i] || 1)) * 100;
+    const minusDI = (smoothMinusDM[i] / (smoothTR[i] || 1)) * 100;
+    return (Math.abs(plusDI - minusDI) / (plusDI + minusDI || 1)) * 100;
+  });
+}
+
+function calculateCMO(values: number[], period: number): number[] {
+  const result = [];
+  for (let i = period; i < values.length; i++) {
+    let upSum = 0, downSum = 0;
+    for (let j = i - period + 1; j <= i; j++) {
+      const diff = values[j] - values[j - 1];
+      if (diff > 0) upSum += diff;
+      else downSum += Math.abs(diff);
+    }
+    result.push(((upSum - downSum) / (upSum + downSum || 1)) * 100);
+  }
+  return result;
+}
+
+function calculateAroon(highs: number[], lows: number[], period: number): any[] {
+  const result = [];
+  for (let i = period - 1; i < highs.length; i++) {
+    const highSlice = highs.slice(i - period + 1, i + 1);
+    const lowSlice = lows.slice(i - period + 1, i + 1);
+    
+    const highIdx = highSlice.indexOf(Math.max(...highSlice));
+    const lowIdx = lowSlice.indexOf(Math.min(...lowSlice));
+    
+    result.push({
+      up: ((period - 1 - highIdx) / period) * 100,
+      down: ((period - 1 - lowIdx) / period) * 100
+    });
+  }
+  return result;
+}
+
+function calculateBOP(opens: number[], highs: number[], lows: number[], closes: number[]): number[] {
+  return opens.map((o, i) => {
+    const range = highs[i] - lows[i];
+    return range === 0 ? 0 : (closes[i] - o) / range;
+  });
 }
 
 // Import all other functions from helpers
