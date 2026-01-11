@@ -185,11 +185,22 @@ export function calculateSMMA(values: number[], period: number): number[] {
 }
 
 export function calculateVIDYA(values: number[], period: number): number[] {
-  const cmo = calculateCMOHelper(values, period);
+  // CMO helper inline
+  const cmo = [];
+  for (let i = period; i < values.length; i++) {
+    let upSum = 0, downSum = 0;
+    for (let j = i - period + 1; j <= i; j++) {
+      const diff = values[j] - values[j - 1];
+      if (diff > 0) upSum += diff;
+      else downSum += Math.abs(diff);
+    }
+    cmo.push(((upSum - downSum) / (upSum + downSum || 1)) * 100);
+  }
+  
   const result = [values[0]];
   
   for (let i = 1; i < values.length; i++) {
-    const alpha = Math.abs(cmo[i] || 0) / 100;
+    const alpha = Math.abs(cmo[i - 1] || 0) / 100;
     const vidya = alpha * values[i] + (1 - alpha) * result[result.length - 1];
     result.push(vidya);
   }
@@ -386,8 +397,13 @@ export function calculateVolumeSplit(closes: number[], volumes: number[]): any[]
 export function calculateKVO(highs: number[], lows: number[], closes: number[], volumes: number[], shortPeriod: number, longPeriod: number): number[] {
   const trend = closes.map((c, i) => i === 0 ? 0 : c + highs[i] + lows[i] > closes[i - 1] + highs[i - 1] + lows[i - 1] ? 1 : -1);
   const dm = highs.map((h, i) => h - lows[i]);
-  const cm = dm.map((d, i) => i === 0 ? d : trend[i] === trend[i - 1] ? cm[i - 1] + d : cm[i - 1]);
-  const vf = volumes.map((v, i) => v * trend[i] * 100 * (dm[i] / cm[i]));
+  const cm: number[] = [dm[0]];
+  
+  for (let i = 1; i < dm.length; i++) {
+    cm.push(trend[i] === trend[i - 1] ? cm[i - 1] + dm[i] : dm[i]);
+  }
+  
+  const vf = volumes.map((v, i) => v * trend[i] * 100 * (dm[i] / (cm[i] || 1)));
   
   const shortEMA = EMA.calculate({ values: vf, period: shortPeriod });
   const longEMA = EMA.calculate({ values: vf, period: longPeriod });
