@@ -2,7 +2,7 @@
 import { 
   RSI, MACD, SMA, EMA, WMA, BollingerBands, Stochastic, StochasticRSI,
   ADX, ADXR, CCI, MFI, ROC, WilliamsR, ATR, OBV, TrueRange, PSAR,
-  Aroon, AroonOscillator, BOP, CMO, DX, PPO, KAMA, VWMA, TRIMA
+  Aroon, AroonOscillator, BOP, CMO, DX
 } from 'technicalindicators';
 
 import { fetchOHLCV, OHLCVData } from './dataFetcher';
@@ -285,14 +285,9 @@ function computeIndicator(indicator: string, data: any, params: any): any {
         return fastEmaAPO.map((f: number, i: number) => f - slowEmaAPO[i]);
       
       case 'ppo':
-        return PPO.calculate({
-          values: closes,
-          fastPeriod: params.fastPeriod || 12,
-          slowPeriod: params.slowPeriod || 26,
-          signalPeriod: params.signalPeriod || 9,
-          SimpleMAOscillator: false,
-          SimpleMASignal: false
-        });
+        const fastEmaPPO = EMA.calculate({ values: closes, period: params.fastPeriod || 12 });
+        const slowEmaPPO = EMA.calculate({ values: closes, period: params.slowPeriod || 26 });
+        return fastEmaPPO.map((f: number, i: number) => ((f - slowEmaPPO[i]) / slowEmaPPO[i]) * 100);
       
       case 'ultosc':
         return calculateUltimateOscillator(highs, lows, closes, 
@@ -360,7 +355,7 @@ function computeIndicator(indicator: string, data: any, params: any): any {
         return calculateTEMA(closes, params.period || 20);
       
       case 'trima':
-        return TRIMA.calculate({ values: closes, period: params.period || 20 });
+        return calculateTRIMA(closes, params.period || 20);
       
       case 'hma':
         return calculateHMA(closes, params.period || 9);
@@ -378,7 +373,7 @@ function computeIndicator(indicator: string, data: any, params: any): any {
         return SMA.calculate({ values: closes, period: params.period || 20 });
       
       case 'vwma':
-        return VWMA.calculate({ close: closes, volume: volumes, period: params.period || 20 });
+        return helpers.calculateVWMA(closes, volumes, params.period || 20);
       
       case 'mama':
         return calculateMAMA(closes, params.fastLimit || 0.5, params.slowLimit || 0.05);
@@ -651,6 +646,42 @@ function calculateHMA(values: number[], period: number): number[] {
   const wma2 = WMA.calculate({ values, period });
   const diff = wma1.map((v: number, i: number) => 2 * v - wma2[i]);
   return WMA.calculate({ values: diff, period: sqrtPeriod });
+}
+
+function calculateKAMA(values: number[], period: number): number[] {
+  const result = [values[0]];
+  const fastSC = 2 / (2 + 1);
+  const slowSC = 2 / (30 + 1);
+  
+  for (let i = period; i < values.length; i++) {
+    const change = Math.abs(values[i] - values[i - period]);
+    let volatility = 0;
+    for (let j = i - period + 1; j <= i; j++) {
+      volatility += Math.abs(values[j] - values[j - 1]);
+    }
+    const er = change / (volatility || 1);
+    const sc = Math.pow(er * (fastSC - slowSC) + slowSC, 2);
+    result.push(result[result.length - 1] + sc * (values[i] - result[result.length - 1]));
+  }
+  return result;
+}
+
+function calculateTRIMA(values: number[], period: number): number[] {
+  const sma1 = SMA.calculate({ values, period });
+  return SMA.calculate({ values: sma1, period });
+}
+
+function calculateVWMA(closes: number[], volumes: number[], period: number): number[] {
+  const result = [];
+  for (let i = period - 1; i < closes.length; i++) {
+    let sumPV = 0, sumV = 0;
+    for (let j = i - period + 1; j <= i; j++) {
+      sumPV += closes[j] * volumes[j];
+      sumV += volumes[j];
+    }
+    result.push(sumPV / (sumV || 1));
+  }
+  return result;
 }
 
 // Import all other functions from helpers
