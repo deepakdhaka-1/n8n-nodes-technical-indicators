@@ -60,8 +60,7 @@ export class TechnicalIndicators implements INodeType {
         name: 'exchange',
         type: 'options',
         options: [
-          { name: 'Hyperliquid (HIP-3)', value: 'hyperliquid' },
-          { name: 'Lightchain (HIP-3)', value: 'lightchain' },
+          { name: 'Hyperliquid', value: 'hyperliquid' },
           { name: 'Binance', value: 'binance' },
           { name: 'Binance US', value: 'binanceus' },
           { name: 'Coinbase', value: 'coinbase' },
