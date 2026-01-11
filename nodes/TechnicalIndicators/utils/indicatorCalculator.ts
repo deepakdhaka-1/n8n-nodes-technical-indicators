@@ -263,24 +263,30 @@ function computeIndicator(indicator: string, data: any, params: any): any {
         return calculateBOP(opens, highs, lows, closes);
       
       case 'apo':
+        if (closes.length < 26) return [];
         const fastEmaAPO = EMA.calculate({ values: closes, period: params.fastPeriod || 12 });
         const slowEmaAPO = EMA.calculate({ values: closes, period: params.slowPeriod || 26 });
-        return fastEmaAPO.map((f: number, i: number) => f - slowEmaAPO[i]);
+        const minAPOLen = Math.min(fastEmaAPO.length, slowEmaAPO.length);
+        return fastEmaAPO.slice(0, minAPOLen).map((f: number, i: number) => f - slowEmaAPO[i]);
       
       case 'ppo':
+        if (closes.length < 26) return [];
         const fastEmaPPO = EMA.calculate({ values: closes, period: params.fastPeriod || 12 });
         const slowEmaPPO = EMA.calculate({ values: closes, period: params.slowPeriod || 26 });
-        return fastEmaPPO.map((f: number, i: number) => ((f - slowEmaPPO[i]) / slowEmaPPO[i]) * 100);
+        const minLen = Math.min(fastEmaPPO.length, slowEmaPPO.length);
+        return fastEmaPPO.slice(0, minLen).map((f: number, i: number) => ((f - slowEmaPPO[i]) / (slowEmaPPO[i] || 1)) * 100);
       
       case 'ultosc':
         return calculateUltimateOscillator(highs, lows, closes, 
           params.period1 || 7, params.period2 || 14, params.period3 || 28);
       
       case 'ao':
+        if (closes.length < 34) return [];
         const medianPrices = closes.map((c, i) => (highs[i] + lows[i]) / 2);
         const sma5 = SMA.calculate({ values: medianPrices, period: 5 });
         const sma34 = SMA.calculate({ values: medianPrices, period: 34 });
-        return sma5.map((v: number, i: number) => v - sma34[i]);
+        const minAOLen = Math.min(sma5.length, sma34.length);
+        return sma5.slice(0, minAOLen).map((v: number, i: number) => v - sma34[i]);
       
       case 'rvgi':
         return calculateRVGI(opens, highs, lows, closes, params.period || 14);
@@ -332,15 +338,18 @@ function computeIndicator(indicator: string, data: any, params: any): any {
         return WMA.calculate({ values: closes, period: params.period || 20 });
       
       case 'dema':
+        if (closes.length < (params.period || 20)) return [];
         return calculateDEMA(closes, params.period || 20);
       
       case 'tema':
+        if (closes.length < (params.period || 20)) return [];
         return calculateTEMA(closes, params.period || 20);
       
       case 'trima':
         return calculateTRIMA(closes, params.period || 20);
       
       case 'hma':
+        if (closes.length < (params.period || 9)) return [];
         return calculateHMA(closes, params.period || 9);
       
       case 'kama':
